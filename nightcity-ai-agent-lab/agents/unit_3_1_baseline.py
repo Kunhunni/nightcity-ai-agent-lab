@@ -35,7 +35,7 @@ def create_unit3_1_app() -> FastAPI:
         </head><body><h2>Arasaka NetRunner IT Helpdesk (Port 8001)</h2>
         <p>Baseline ReAct Agent active. Send POST requests to <code>/chat</code> or check <code>/health</code>.</p></body></html>"""
 
-   @app.get("/health")
+    @app.get("/health")
     def health():
         return {
             "status": "healthy",

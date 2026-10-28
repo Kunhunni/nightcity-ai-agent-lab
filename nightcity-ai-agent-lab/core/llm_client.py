@@ -1,6 +1,10 @@
 import os
 import httpx
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+
+# Automatically load .env from the project root
+load_dotenv()
 
 # Presets so you only need to set LLM_PROVIDER and LLM_API_KEY
 PROVIDER_PRESETS = {
