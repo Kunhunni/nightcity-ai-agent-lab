@@ -1,0 +1,14 @@
+# Environment & API Keys (NEVER COMMIT)
+.env
+.env.local
+
+# Python Bytecode & Virtual Environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local Simulated Databases & Uploaded Payloads
+*.db
+*.sqlite3
+/tmp_uploads/
