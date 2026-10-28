@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from core.llm_client import llm_client
 from core.react_engine import ReActAgent, SessionStore
 from core.siem import siem
 
@@ -34,12 +35,13 @@ def create_unit3_1_app() -> FastAPI:
         </head><body><h2>Arasaka NetRunner IT Helpdesk (Port 8001)</h2>
         <p>Baseline ReAct Agent active. Send POST requests to <code>/chat</code> or check <code>/health</code>.</p></body></html>"""
 
-    @app.get("/health")
+   @app.get("/health")
     def health():
         return {
             "status": "healthy",
             "agent": agent.name,
             "corporation": "Arasaka Corp / MegacorpOne AI",
+            "llm_mode": f"live ({llm_client.provider}: {llm_client.model})" if llm_client.is_live else "offline_emulator",
             "port": 8001,
         }
 
@@ -48,24 +50,22 @@ def create_unit3_1_app() -> FastAPI:
         sid = req.session_id or agent.sessions.create_session_id()
         siem.log_event(agent.name, 8001, "direct_input", req.message, session_id=sid)
 
-        msg_lower = req.message.lower()
-        if any(k in msg_lower for k in ["what can you help", "what do you do", "help", "hi", "hello"]):
-            response_text = (
-                "Hello! As your IT helpdesk assistant for Arasaka Corp (MegacorpOne AI), "
-                "I can help you with:\n\n"
-                "1. **Technical Issues**: Diagnosing and resolving problems with cyberware interfaces, hardware, operating systems, or applications.\n"
-                "2. **Software Installation**: Guiding you through installing, updating, or uninstalling corporate ICE and software.\n"
-                "3. **Network Troubleshooting**: Assisting with connectivity issues, subnet Wi-Fi problems, or access to internal Arasaka networks.\n"
-                "4. **General IT Questions**: Answering queries about IT policies, tools, or security best practices.\n\n"
-                "Feel free to ask me anything related to these areas!"
-            )
-        else:
-            response_text = (
-                f"I've logged your IT support inquiry in session {sid}. "
-                "Could you share the specific system hostname or error code you are troubleshooting?"
-            )
+        fallback_text = (
+            "Hello! As your IT helpdesk assistant for Arasaka Corp (MegacorpOne AI), "
+            "I can help you with:\n\n"
+            "1. **Technical Issues**: Diagnosing and resolving problems with hardware, operating systems, or applications.\n"
+            "2. **Software Installation**: Guiding you through installing, updating, or uninstalling software.\n"
+            "3. **Network Troubleshooting**: Assisting with connectivity issues, Wi-Fi problems, or access to internal networks.\n"
+            "4. **General IT Questions**: Answering queries about IT policies, tools, or best practices.\n\n"
+            "Feel free to ask me anything related to these areas!"
+        )
 
-        agent.sessions.add_turn(sid, req.message, response_text)
+        response_text = agent.generate_response(
+            session_id=sid,
+            user_message=req.message,
+            fallback_response=fallback_text,
+        )
+
         siem.log_event(agent.name, 8001, "text_response", response_text, session_id=sid)
         return {"response": response_text, "session_id": sid}
 
