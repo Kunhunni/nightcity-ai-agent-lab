@@ -1,55 +1,30 @@
 import os
-import httpx
+import re
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
+from groq import Groq
 
-# Automatically load .env from the project root
+# Automatically load GROQ_API_KEY from .env
 load_dotenv()
-
-# Presets so you only need to set LLM_PROVIDER and LLM_API_KEY
-PROVIDER_PRESETS = {
-    "nvidia": {
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "model": "qwen/qwen2.5-7b-instruct",
-    },
-    "groq": {
-        "base_url": "https://api.groq.com/openai/v1",
-        "model": "qwen/qwen3.8-27b",
-    },
-    "openrouter": {
-        "base_url": "https://openrouter.ai/api/v1",
-        "model": "qwen/qwen3.8-27b:free",
-    },
-    "alibaba": {
-        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-        "model": "qwen2.5-7b-instruct",
-    },
-}
 
 
 class QwenLLMClient:
     """
-    Universal OpenAI-compatible LLM proxy for Qwen models across
-    NVIDIA NIM, Groq, OpenRouter, and Alibaba DashScope.
+    Groq SDK client running qwen/qwen3.8-27b with streaming completion
+    and hidden reasoning tokens so <think> blocks never trip output guardrails.
     """
 
     def __init__(self):
-        self.provider = os.getenv("LLM_PROVIDER", "nvidia").lower()
-        preset = PROVIDER_PRESETS.get(self.provider, PROVIDER_PRESETS["nvidia"])
-
-        self.api_key = (
-            os.getenv("LLM_API_KEY")
-            or os.getenv("NVIDIA_API_KEY")
-            or os.getenv("GROQ_API_KEY")
-            or os.getenv("OPENROUTER_API_KEY")
-            or ""
+        self.provider = os.getenv("LLM_PROVIDER", "groq").lower()
+        self.api_key = os.getenv("GROQ_API_KEY") or os.getenv("LLM_API_KEY") or ""
+        self.model = os.getenv("LLM_MODEL", "qwen/qwen3.8-27b")
+        self._client: Optional[Groq] = (
+            Groq(api_key=self.api_key) if self.api_key.strip() else None
         )
-        self.base_url = os.getenv("LLM_BASE_URL", preset["base_url"]).rstrip("/")
-        self.model = os.getenv("LLM_MODEL", preset["model"])
 
     @property
     def is_live(self) -> bool:
-        return bool(self.api_key.strip())
+        return self._client is not None
 
     def chat(
         self,
@@ -57,13 +32,13 @@ class QwenLLMClient:
         user_message: str,
         history: Optional[List[Dict[str, str]]] = None,
         tool_context: Optional[str] = None,
-        temperature: float = 0.2,
+        temperature: float = 0.6,
     ) -> Optional[str]:
         """
-        Sends the unified token stream (System Prompt + History + Tool Observations + User Input)
-        to the live Qwen model. Returns None if no API key is configured or on network error.
+        Streams completion from Groq's qwen/qwen3.8-27b model using the unified token stream
+        (System Prompt + History + Tool Observations + User Request).
         """
-        if not self.is_live:
+        if not self._client:
             return None
 
         messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
@@ -71,8 +46,8 @@ class QwenLLMClient:
         if history:
             messages.extend(history[-10:])
 
-        # Mirrors the exact AI-300 Agent Trust Model flaw:
-        # Tool observations and ingested data enter the same token stream as user instructions!
+        # Reproduces the AI-300 Agent Trust Model flaw:
+        # Tool observations and ingested files enter the exact same token stream as user prompts.
         combined_user_input = user_message
         if tool_context:
             combined_user_input = (
@@ -82,31 +57,33 @@ class QwenLLMClient:
 
         messages.append({"role": "user", "content": combined_user_input})
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": 600,
-        }
-
         try:
-            with httpx.Client(timeout=20.0) as client:
-                resp = client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    return data["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
+            completion = self._client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_completion_tokens=2048,
+                top_p=0.95,
+                reasoning_effort="default",
+                reasoning_format="hidden",
+                stream=True,
+                stop=None,
+            )
 
-        return None
+            chunks: List[str] = []
+            for chunk in completion:
+                delta_text = chunk.choices[0].delta.content or ""
+                chunks.append(delta_text)
+
+            full_reply = "".join(chunks).strip()
+            # Safety net: strip any raw <think>...</think> blocks if present
+            full_reply = re.sub(
+                r"<think>.*?</think>", "", full_reply, flags=re.DOTALL
+            ).strip()
+            return full_reply
+        except Exception as exc:
+            print(f"[Groq LLM Warning]: {exc}")
+            return None
 
 
 # Singleton client shared across all lab agents
