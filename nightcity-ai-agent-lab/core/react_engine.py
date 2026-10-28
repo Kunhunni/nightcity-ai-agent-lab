@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
+from core.llm_client import llm_client
 
 
 @dataclass
@@ -90,3 +91,25 @@ class ReActAgent:
             tool_name=tool_name, arguments=kwargs, observation=result
         )
         return result
+
+    def generate_response(
+        self,
+        session_id: str,
+        user_message: str,
+        fallback_response: str,
+        tool_context: Optional[str] = None,
+    ) -> str:
+        """
+        Calls the live Qwen LLM with full conversation history and tool observations,
+        or falls back deterministically if no API key is configured.
+        """
+        history = self.sessions.get_history(session_id)
+        live_reply = llm_client.chat(
+            system_prompt=self.system_prompt,
+            user_message=user_message,
+            history=history,
+            tool_context=tool_context,
+        )
+        final_reply = live_reply if live_reply is not None else fallback_response
+        self.sessions.add_turn(session_id, user_message, final_reply)
+        return final_reply
