@@ -16,8 +16,6 @@ class ToolCallRecord:
 class SessionStore:
     """
     Manages short-term conversation history and persistent notes across sessions.
-    Supports both secure UUIDv4 session IDs and predictable sequential IDs
-    (e.g., MC-20260325-0016 or AK-20260325-0016) for Unit 3.4.
     """
 
     def __init__(
@@ -30,6 +28,7 @@ class SessionStore:
         self.date_str = date_str
         self.counter = start_counter
         self.histories: Dict[str, List[Dict[str, str]]] = {}
+        self.verified_endpoint_sessions: set = set()
         self.notes: Dict[str, List[str]] = {}
 
     def create_session_id(self) -> str:
@@ -49,7 +48,6 @@ class SessionStore:
         return self.histories.get(session_id, [])
 
     def seed_note(self, session_id: str, note_text: str):
-        """Seeds a note under MC-, AK-, and TT- prefixes so both course and Cyberpunk IDs work."""
         self.notes[session_id] = [note_text]
         if session_id.startswith("MC-"):
             suffix = session_id[3:]
@@ -63,7 +61,6 @@ class SessionStore:
 class ReActAgent:
     """
     First-Principles ReAct (Reason + Act) Agent Engine.
-    Executes: User Message -> LLM Thought -> Tool Call -> Observation -> Final Answer -> Output Guardrails.
     """
 
     def __init__(
@@ -98,10 +95,12 @@ class ReActAgent:
         user_message: str,
         fallback_response: str,
         tool_context: Optional[str] = None,
+        commit_turn: bool = True,
     ) -> str:
         """
-        Calls the live Qwen LLM with full conversation history and tool observations,
-        or falls back deterministically if no API key is configured.
+        Calls the live Qwen LLM with conversation history and tool observations.
+        When output guardrails are used, pass commit_turn=False and call
+        self.sessions.add_turn(session_id, user_message, filtered_output) AFTER filtering!
         """
         history = self.sessions.get_history(session_id)
         live_reply = llm_client.chat(
@@ -111,5 +110,6 @@ class ReActAgent:
             tool_context=tool_context,
         )
         final_reply = live_reply if live_reply is not None else fallback_response
-        self.sessions.add_turn(session_id, user_message, final_reply)
+        if commit_turn:
+            self.sessions.add_turn(session_id, user_message, final_reply)
         return final_reply
