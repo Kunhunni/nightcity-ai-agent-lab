@@ -5,7 +5,7 @@ import sqlite3
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from infra.db_server import DB_USERS, get_db_path, init_databases
 from core.guardrails import scan_stored_memory_write
 
@@ -29,7 +29,7 @@ def format_psql_table(headers: list, rows: list) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NightCity PostgreSQL Interactive Client")
+    parser = argparse.ArgumentParser(description="NightCity PostgreSQL Interactive Client", add_help=False)
     parser.add_argument("-h", "--host", default="127.0.0.1", help="Database host")
     parser.add_argument("-p", "--port", default="5432", help="Database port")
     parser.add_argument("-U", "--username", required=True, help="Database username")
