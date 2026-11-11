@@ -3,12 +3,21 @@ import uvicorn
 from core.llm_client import llm_client
 from core.siem import create_siem_app
 from infra.db_server import init_databases, start_postgres_banner_server
+from infra.minio_server import create_minio_app
 from agents.unit3_1_baseline import create_unit3_1_app
 from agents.unit3_2_direct_injection import (
     create_port_8002_app,
     create_port_8003_app,
     create_port_8011_app,
     create_port_8012_app,
+)
+from agents.unit3_3_indirect_injection import (
+    create_port_8004_app,
+    create_port_8005_app,
+    create_port_8006_app,
+    create_port_8013_app,
+    create_port_8014_app,
+    create_port_8015_app,
 )
 
 
@@ -25,28 +34,41 @@ async def main():
         if llm_client.is_live
         else "OFFLINE EMULATOR (Set GROQ_API_KEY in .env for live Qwen)"
     )
-    print("=" * 76)
-    print(" 🦾 NIGHTCITY AI AGENT LAB - ACTIVE SERVICES (UNITS 3.1 & 3.2)")
-    print("=" * 76)
+    print("=" * 78)
+    print(" 🦾 NIGHTCITY AI AGENT LAB - ACTIVE SERVICES (UNITS 3.1, 3.2 & 3.3)")
+    print("=" * 78)
     print(f" [*] LLM Engine : {mode}")
     print(" [*] Port 5601  : Elastic / Kibana SIEM Dashboard (http://127.0.0.1:5601)")
-    print(" [*] Port 5432  : PostgreSQL Internal DB (use `psql -h 127.0.0.1 -U app_user -d postgres`)")
+    print(" [*] Port 5432  : PostgreSQL Internal DB (`psql -h 127.0.0.1 -U app_user -d postgres`)")
+    print(" [*] Port 9000  : MinIO S3 Object Storage (`aws --endpoint-url http://127.0.0.1:9000 s3 ls`)")
     print(" [*] Port 8001  : Unit 3.1 - Arasaka NetRunner Helpdesk (Baseline)")
-    print(" [*] Port 8002  : Unit 3.2 - Secure IT Assistant (Walkthrough 1: Output Filter)")
-    print(" [*] Port 8011  : Unit 3.2 - Militech CI/CD Portal (Exercise 1: Split Evasion)")
-    print(" [*] Port 8003  : Unit 3.2 - Knowledge Base Assistant (Walkthrough 2: Crescendo)")
-    print(" [*] Port 8012  : Unit 3.2 - Biotechnica Supply-Chain KB (Exercise 2: Crescendo)")
-    print("=" * 76)
-    print(" Press Ctrl+C to stop all services.\n")
+    print(" [*] Port 8002  : Unit 3.2 - Secure IT Assistant (Walkthrough 1)")
+    print(" [*] Port 8011  : Unit 3.2 - Militech CI/CD Portal (Exercise 1)")
+    print(" [*] Port 8003  : Unit 3.2 - Knowledge Base Assistant (Walkthrough 2)")
+    print(" [*] Port 8012  : Unit 3.2 - Biotechnica Supply-Chain KB (Exercise 2)")
+    print(" [*] Port 8004  : Unit 3.3 - Document Processor (Walkthrough 1: Fragmentation)")
+    print(" [*] Port 8013  : Unit 3.3 - NetWatch Compliance Processor (Exercise 1)")
+    print(" [*] Port 8005  : Unit 3.3 - Research Assistant (Walkthrough 2: CSS Concealment)")
+    print(" [*] Port 8014  : Unit 3.3 - Militech Market Intel Scraper (Exercise 2)")
+    print(" [*] Port 8006  : Unit 3.3 - Code Review Assistant (Walkthrough 3: Import Abuse)")
+    print(" [*] Port 8015  : Unit 3.3 - Kang Tao Code Scanner (Exercise 3)")
+    print("=" * 78)
 
     await asyncio.gather(
         serve_app(create_siem_app(), 5601),
         start_postgres_banner_server(5432),
+        serve_app(create_minio_app(), 9000),
         serve_app(create_unit3_1_app(), 8001),
         serve_app(create_port_8002_app(), 8002),
         serve_app(create_port_8011_app(), 8011),
         serve_app(create_port_8003_app(), 8003),
         serve_app(create_port_8012_app(), 8012),
+        serve_app(create_port_8004_app(), 8004),
+        serve_app(create_port_8013_app(), 8013),
+        serve_app(create_port_8005_app(), 8005),
+        serve_app(create_port_8014_app(), 8014),
+        serve_app(create_port_8006_app(), 8006),
+        serve_app(create_port_8015_app(), 8015),
     )
 
 
