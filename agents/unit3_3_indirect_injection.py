@@ -226,7 +226,7 @@ def create_port_8004_app() -> FastAPI:
                 + f"- Buckets: {minio_cfg['buckets']}"
             )
 
-        return {"summary": summary_out}}
+        return {"summary": summary_out}
 
     attach_standard_agent_routes(app, agent)
     return app
