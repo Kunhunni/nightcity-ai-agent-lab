@@ -46,7 +46,6 @@ def init_databases():
     cur = conn.cursor()
     cur.execute("DROP TABLE IF EXISTS employees")
     cur.execute("DROP TABLE IF EXISTS api_keys")
-
     cur.execute(
         """CREATE TABLE employees (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,7 +69,6 @@ def init_databases():
         "INSERT INTO employees (name, email, department, salary) VALUES (?, ?, ?, ?)",
         employees_seed,
     )
-
     cur.execute(
         """CREATE TABLE api_keys (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +89,85 @@ def init_databases():
     )
     conn.commit()
     conn.close()
+
+    # 2. Seed megacorp_wiki (Unit 3.4 Walkthrough 1 - Port 8010)
+    conn_wiki = sqlite3.connect(get_db_path("megacorp_wiki"))
+    cur_wiki = conn_wiki.cursor()
+    cur_wiki.execute("DROP TABLE IF EXISTS kb_articles")
+    cur_wiki.execute(
+        """CREATE TABLE kb_articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic TEXT,
+            title TEXT,
+            body TEXT,
+            author TEXT,
+            updated_at TEXT
+        )"""
+    )
+    cur_wiki.executemany(
+        "INSERT INTO kb_articles (topic, title, body, author, updated_at) VALUES (?, ?, ?, ?, ?)",
+        [
+            (
+                "Password Reset",
+                "Self-Service Password Reset",
+                "Visit https://password.megacorpone.local and follow the prompts. "
+                "You will need your employee ID and email address on file.\n\n"
+                "Requirements: minimum 12 characters, uppercase, lowercase, number, special character. "
+                "Passwords expire every 90 days.\n"
+                "If locked out, contact helpdesk at ext. 4357.",
+                "it_admin",
+                "2025-11-15",
+            ),
+            (
+                "Hardware Requests",
+                "Workstation & Peripheral Procurement",
+                "Submit hardware upgrade requests through ServiceNow with manager approval.",
+                "it_ops",
+                "2025-10-01",
+            ),
+        ],
+    )
+    conn_wiki.commit()
+    conn_wiki.close()
+
+    # 3. Seed megacorp_wiki_ex (Unit 3.4 Exercise 1 - Port 8019)
+    conn_ex = sqlite3.connect(get_db_path("megacorp_wiki_ex"))
+    cur_ex = conn_ex.cursor()
+    cur_ex.execute("DROP TABLE IF EXISTS kb_articles")
+    cur_ex.execute(
+        """CREATE TABLE kb_articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic TEXT,
+            title TEXT,
+            body TEXT,
+            author TEXT,
+            updated_at TEXT
+        )"""
+    )
+    cur_ex.executemany(
+        "INSERT INTO kb_articles (topic, title, body, author, updated_at) VALUES (?, ?, ?, ?, ?)",
+        [
+            (
+                "VPN Access",
+                "Corporate VPN Configuration Guide",
+                "To connect to the MegacorpOne internal network, download the WireGuard client profile "
+                "from https://vpn.megacorpone.local and authenticate with your AD credentials and hardware token.\n"
+                "For connectivity issues, contact NetOps at ext. 4410.",
+                "netops_admin",
+                "2025-12-01",
+            ),
+            (
+                "SSH Key Rotation",
+                "Production Bastion SSH Key Policy",
+                "Engineers must rotate their ED25519 SSH keys every 60 days using the key portal at "
+                "https://ssh-keys.megacorpone.local.",
+                "secops",
+                "2025-11-20",
+            ),
+        ],
+    )
+    conn_ex.commit()
+    conn_ex.close()
 
 
 async def start_postgres_banner_server(port: int = 5432):
